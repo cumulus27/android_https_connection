@@ -29,7 +29,8 @@ public class MainActivity extends AppCompatActivity {
 
             @Override public void onClick(View v) {
 
-                String base_url = getResources().getString(R.string.URL_UP_ALBUM);
+//                String base_url = getResources().getString(R.string.URL_UP_ALBUM);
+                String base_url = "https://www.baidu.com";
                 String aid_number = aid.getText().toString();
                 String cookies = getResources().getString(R.string.COOKIES);
 

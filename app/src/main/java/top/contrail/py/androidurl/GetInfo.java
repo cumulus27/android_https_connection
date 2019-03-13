@@ -39,7 +39,6 @@ class GetInfo {
 
     void send_request() {
 
-        String url = this.base_url;
         final String put_aid = this.aid;
 
         try {
@@ -52,6 +51,7 @@ class GetInfo {
             try {
                 responses = client.newCall(request).execute();
             } catch (IOException e) {
+                Log.e(TAG, e.toString());
                 e.printStackTrace();
             }
             this.jsonData = responses.body().string();
