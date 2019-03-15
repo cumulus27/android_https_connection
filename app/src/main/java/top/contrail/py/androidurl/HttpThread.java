@@ -9,11 +9,11 @@ class MyAsyncTask extends AsyncTask<String, Void, Void> {
         String aid = strings[1];
         String cookies = strings[2];
 
-        GetInfo task = new GetInfo(aid);
+//        GetInfo task = new GetInfo(aid);
 //        task.set_parameter(url, cookies);
-        task.send_request();
-        task.analyse_result();
-        String info = task.get_response();
+//        task.send_request();
+//        task.analyse_result();
+//        String info = task.get_response();
 //        content.setText(info);
 
         return null;

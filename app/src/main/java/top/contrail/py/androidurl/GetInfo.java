@@ -1,7 +1,11 @@
 package top.contrail.py.androidurl;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -9,6 +13,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.security.acl.LastOwnerException;
+import java.util.concurrent.ExecutorService;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -19,18 +28,19 @@ class GetInfo {
     private static final String TAG = "GetInfo";
 
     private String aid;
-    private String result_json;
     private String base_url;
+    private String result_str;
     private String cookies;
-    private String jsonData;
+
+    String result_str0;
+    String image_url = "";
 
     private Handler handler;
 
     GetInfo(String aid_) {
+        aid_ = aid_.replace("av", "");
         this.aid = aid_;
-        this.result_json = null;
-        this.jsonData = null;
-
+        this.result_str = null;
     }
 
     void set_parameter(String url, String cookie, Handler handler_in) {
@@ -41,13 +51,19 @@ class GetInfo {
 
     }
 
-    void send_request() {
+    void send_request(ExecutorService pool) {
 
         final String put_aid = this.aid;
-        final String url = this.base_url;
-        final String result_str;
+        final GetInfo this_task = this;
 
-        new Thread(new Runnable() {
+        Uri.Builder builder = Uri.parse(this.base_url).buildUpon();
+        builder.appendQueryParameter("aid", put_aid);
+        String paramUrl=builder.build().toString();
+        Log.d(TAG, paramUrl);
+
+        final String url = paramUrl;
+
+        Thread get_thread = new Thread(new Runnable() {
             @Override
             public void run() {
 
@@ -66,42 +82,124 @@ class GetInfo {
                     }
 
                     try {
-//                        this.jsonData = responses.body().string();
-//                    result_str = responses.body().string();
-                        Log.d(TAG, responses.body().string());
+                        String result_str = responses.body().string();
+                        Log.d(TAG, result_str);
+
+                        this_task.result_str0 = result_str;
+
+                        Message message=new Message();
+                        message.what=1;
+                        message.obj=this_task;
+                        handler.sendMessage(message);
+
+                        try{
+                            Thread.sleep(1000);
+                        }catch (InterruptedException e){
+                            Log.e(TAG, e.toString());
+                        }
 
                     }catch (NullPointerException e){
                         Log.e(TAG, e.toString());
                         e.printStackTrace();
                     }
 
-
-//                    JSONObject Jobject = new JSONObject(this.jsonData);
-//            JSONArray Jarray = Jobject.getJSONArray("employees");
-//
-//            for (int i = 0; i < Jarray.length(); i++) {
-//                JSONObject object     = Jarray.getJSONObject(i);
-//            }
-
-//                    this.result_json = Jobject.toString();
-
-//                }catch (JSONException e){
-//                    Log.e(TAG, e.toString());
                 }catch (IOException e) {
                     Log.e(TAG, e.toString());
                 }
             }
-        }).start();
+        });
 
-
+//        get_thread.start();
+        pool.submit(get_thread);
+        Log.d(TAG, "Submit thread (send_request)");
     }
 
-    void analyse_result() {
-//        this.result_json = result.toString();
+    void analyse_result(String result_s) {
+
+        JSONObject result = null;
+
+        try{
+            result = new JSONObject(result_s);
+        }catch (JSONException e){
+            Log.e(TAG, e.toString());
+        }
+
+        String lines = "";
+        String[] keys = {"title", "tname", "dynamic", "videos", "desc"};
+
+        try{
+
+            JSONObject data = result.getJSONObject("data");
+
+            for (String key: keys) {
+                String item = data.getString(key);
+                String line = String.format("%s: %s\n", key, item);
+                lines = lines.concat(line);
+            }
+
+        }catch (JSONException e){
+            Log.e(TAG, e.toString());
+        }
+
+        this.result_str = lines;
 
     }
 
     String get_response(){
-        return this.result_json;
+        return this.result_str;
     }
+
+    String get_image_url(String result_s){
+
+        JSONObject result = null;
+
+        try{
+            result = new JSONObject(result_s);
+        }catch (JSONException e){
+            Log.e(TAG, e.toString());
+        }
+
+        String key = "pic";
+        String image_url = "";
+
+        try{
+
+            JSONObject data = result.getJSONObject("data");
+            image_url = data.getString(key);
+            Log.d(TAG, image_url);
+
+        }catch (JSONException e){
+            Log.e(TAG, e.toString());
+        }catch (NullPointerException e){
+            Log.e(TAG, e.toString());
+        }
+
+        return image_url;
+
+    }
+
+    void get_image_bit(Handler image_handler){
+
+        Log.d(TAG, "Thread start. (get_image_bit)");
+        final String url = this.image_url;
+        Log.d("Confirm url", url);
+
+        try {
+            Bitmap image_bit = BitmapFactory.decodeStream((InputStream)new URL(url).getContent());
+            Log.d(TAG, "Success get the image");
+
+            Message message=new Message();
+            message.what=1;
+            message.obj=image_bit;
+            image_handler.sendMessage(message);
+//            image_handler.sendMessageDelayed(message, 3000);
+
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
 }

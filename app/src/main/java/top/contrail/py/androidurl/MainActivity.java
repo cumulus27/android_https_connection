@@ -1,5 +1,6 @@
 package top.contrail.py.androidurl;
 
+import android.graphics.Bitmap;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.Message;
@@ -10,34 +11,21 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
     EditText aid=null;
     Button get=null;
     TextView content=null;
+    ImageView cover=null;
 
     private static final String TAG = "MainActivity";
-
-//    Handler handler = new Handler() {
-//        @Override
-//        public void handleMessage(Message msg) {
-//            super.handleMessage(msg);
-//            Werther werther= (Werther) msg.obj;
-//            switch(msg.what){
-//                case 1:
-//                    tv_werther_conten.setText("时间：" + String.valueOf(werther.getHeWeather6().get(0).getUpdate().getLoc()) +
-//                            "、地点：" + werther.getHeWeather6().get(0).getBasic().getLocation() +
-//                            "、天气：" + werther.getHeWeather6().get(0).getNow().getCond_txt() +
-//                            "、风向：" + werther.getHeWeather6().get(0).getNow().getWind_dir() +
-//                            "、气温：" + werther.getHeWeather6().get(0).getNow().getTmp());
-//                    break;
-//            }
-//            Log.d(TAG, "onResponse: " + String.valueOf(werther.getHeWeather6().get(0).getUpdate().getLoc()));
-//
-//        }
-//    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,8 +35,41 @@ public class MainActivity extends AppCompatActivity {
         aid = (EditText) findViewById(R.id.aidText);
         get = (Button) findViewById(R.id.getInfo);
         content=(TextView) findViewById(R.id.aidInfo);
+        cover = (ImageView) findViewById(R.id.cover);
 
         content.setMovementMethod(ScrollingMovementMethod.getInstance());
+
+        final ExecutorService singlePool = Executors.newSingleThreadExecutor();
+
+        final Handler handler = new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                GetInfo task = (GetInfo) msg.obj;
+
+                String result = task.result_str0;
+                task.analyse_result(result);
+
+                String info = task.get_response();
+                content.setText(info);
+
+                task.image_url = task.get_image_url(result);
+                Log.d(TAG, task.image_url);
+
+            }
+        };
+
+        final Handler image_handler = new Handler() {
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                Bitmap image_bit = (Bitmap) msg.obj;
+
+                cover.setImageBitmap(image_bit);
+
+            }
+        };
+
 
         get.setOnClickListener(new View.OnClickListener() {
 
@@ -58,15 +79,19 @@ public class MainActivity extends AppCompatActivity {
                 String aid_number = aid.getText().toString();
                 String cookies = getResources().getString(R.string.COOKIES);
 
-                GetInfo task = new GetInfo(aid_number);
-//                task.set_parameter(base_url, cookies, handler);
-                task.send_request();
-                task.analyse_result();
-                String info = task.get_response();
-                content.setText(info);
+                final GetInfo task = new GetInfo(aid_number);
+                task.set_parameter(base_url, cookies, handler);
+                task.send_request(singlePool);
 
-//                MyAsyncTask task = new MyAsyncTask();
-//                task.execute(base_url, aid_number, cookies);
+                Thread image_task = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        task.get_image_bit(image_handler);
+                    }
+                });
+
+                singlePool.submit(image_task);
+                Log.d(TAG, "Submit thread (image_task)");
 
             }
 
